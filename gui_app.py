@@ -14,6 +14,7 @@ import sys
 import cv2
 import numpy as np
 import torch
+import subprocess
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtSvg import QSvgWidget
@@ -508,37 +509,29 @@ class DualCameraApp(QtWidgets.QMainWindow):
         )
 
     def generate_dieline(self):
-        """Generate dieline from captured measurements."""
+        """Generate dieline from captured measurements by launching gen_cartondieline.py.
+
+        Measurements in this PyQt app are in cm — convert to mm for the external
+        dieline generator. Use 30 mm glue flap.
+        """
         if self.width is None or self.height is None or self.length is None:
             QMessageBox.warning(self, 'Error', 'Please capture measurements first')
             return
 
         try:
-            from dieline import adjust_dimensions, build_reference_svg
+            # Convert cm -> mm
+            length_mm = float(self.length) * 10.0
+            width_mm = float(self.width) * 10.0
+            height_mm = float(self.height) * 10.0
 
-            adjusted_length, adjusted_width, adjusted_height = adjust_dimensions(
-                self.length,
-                self.width,
-                self.height,
-                clearance=6.0,
-            )
+            script_path = os.path.join(os.path.dirname(__file__), 'gen_cartondieline.py')
+            args = [sys.executable, script_path,
+                    '--length', f'{length_mm}',
+                    '--width', f'{width_mm}',
+                    '--height', f'{height_mm}',
+                    '--glue', '30']
 
-            save_path = os.path.abspath('carton_dieline.svg')
-            build_reference_svg(
-                length=adjusted_length,
-                width=adjusted_width,
-                height=adjusted_height,
-                filename=save_path,
-            )
-
-            self.preview_window = DielinePreviewWindow(
-                svg_path=save_path,
-                measured_dimensions=(self.length, self.width, self.height),
-                adjusted_dimensions=(adjusted_length, adjusted_width, adjusted_height),
-            )
-            self.preview_window.show()
-            self.preview_window.raise_()
-            self.preview_window.activateWindow()
+            subprocess.Popen(args)
 
         except Exception as e:
             QMessageBox.critical(self, 'Error', f'Failed to generate dieline:\n{str(e)}')

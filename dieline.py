@@ -801,9 +801,9 @@ if __name__ == '__main__':
     print()
     
     # Input dimensions (measured object)
-    object_length = 30.0  # cm
-    object_width = 20.0   # cm
-    object_height = 15.0  # cm
+    object_length = 17.8  # cm
+    object_width = 12.0   # cm
+    object_height = 2.0  # cm
     
     # Create the dieline with automatic adjustment and SVG export
     dieline = create_carton_dieline(
@@ -835,5 +835,5 @@ if __name__ == '__main__':
     
     # Generate matplotlib dieline with measured dimensions
     fig = generate_dieline(width=object_width, height=object_height, length=object_length, 
-                          show=False, save_path='dieline_matplotlib.png')
+                          show=False, save_path='dieline_matplotlib.svg')
     print("Matplotlib dieline created successfully!")
