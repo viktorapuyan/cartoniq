@@ -113,7 +113,7 @@ class DielinePreviewWindow(QtWidgets.QMainWindow):
         left_layout.addWidget(_dim_block('Height', measured_height, adj_height))
         left_layout.addStretch()
 
-        note = QtWidgets.QLabel('60 mm clearance applied\nto each dimension')
+        note = QtWidgets.QLabel('10 mm clearance applied\nto each dimension')
         note.setAlignment(QtCore.Qt.AlignCenter)
         note.setWordWrap(True)
         note.setStyleSheet(
