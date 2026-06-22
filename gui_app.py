@@ -97,9 +97,9 @@ class DielinePreviewWindow(QtWidgets.QMainWindow):
             bl.setSpacing(2)
             lbl = QtWidgets.QLabel(label)
             lbl.setStyleSheet('font-size: 11px; color: #888; font-weight: bold; text-transform: uppercase;')
-            val = QtWidgets.QLabel(f'{measured:.1f} cm')
+            val = QtWidgets.QLabel(f'{measured:.2f} mm')
             val.setStyleSheet('font-size: 22px; font-weight: bold; color: #1a1a2e;')
-            adj_lbl = QtWidgets.QLabel(f'+ 6 cm  →  {adjusted:.1f} cm')
+            adj_lbl = QtWidgets.QLabel(f'+ 60 mm  →  {adjusted:.2f} mm')
             adj_lbl.setStyleSheet('font-size: 11px; color: #e07b00;')
             bl.addWidget(lbl)
             bl.addWidget(val)
@@ -113,7 +113,7 @@ class DielinePreviewWindow(QtWidgets.QMainWindow):
         left_layout.addWidget(_dim_block('Height', measured_height, adj_height))
         left_layout.addStretch()
 
-        note = QtWidgets.QLabel('6 cm clearance applied\nto each dimension')
+        note = QtWidgets.QLabel('60 mm clearance applied\nto each dimension')
         note.setAlignment(QtCore.Qt.AlignCenter)
         note.setWordWrap(True)
         note.setStyleSheet(
@@ -205,13 +205,16 @@ class DualCameraApp(QtWidgets.QMainWindow):
         self.aruco_params = cv2.aruco.DetectorParameters()
         self.aruco_detector = cv2.aruco.ArucoDetector(self.aruco_dict, self.aruco_params)
 
-        self.ARUCO_MARKER_SIZE_CM = 5.0
+        # ArUco marker physical size in millimetres (5 cm = 50 mm)
+        self.ARUCO_MARKER_SIZE_MM = 50.0
 
+        # Measurements stored in millimetres
         self.width = None
         self.height = None
         self.length = None
-        self.pixels_per_cm_cam1 = None
-        self.pixels_per_cm_cam2 = None
+        # pixels per millimetre for each camera
+        self.pixels_per_mm_cam1 = None
+        self.pixels_per_mm_cam2 = None
         self.preview_window = None
         self.not_allowed_active = False
 
@@ -386,7 +389,7 @@ class DualCameraApp(QtWidgets.QMainWindow):
                     top_width = np.linalg.norm(marker_corners[0] - marker_corners[1])
                     bottom_width = np.linalg.norm(marker_corners[3] - marker_corners[2])
                     marker_width_pixels = (top_width + bottom_width) / 2
-                    self.pixels_per_cm_cam1 = marker_width_pixels / self.ARUCO_MARKER_SIZE_CM
+                    self.pixels_per_mm_cam1 = marker_width_pixels / self.ARUCO_MARKER_SIZE_MM
 
                 qimg = cv2_to_qimage(frame)
                 pixmap = QtGui.QPixmap.fromImage(qimg).scaled(
@@ -412,7 +415,7 @@ class DualCameraApp(QtWidgets.QMainWindow):
                     top_width = np.linalg.norm(marker_corners[0] - marker_corners[1])
                     bottom_width = np.linalg.norm(marker_corners[3] - marker_corners[2])
                     marker_width_pixels = (top_width + bottom_width) / 2
-                    self.pixels_per_cm_cam2 = marker_width_pixels / self.ARUCO_MARKER_SIZE_CM
+                    self.pixels_per_mm_cam2 = marker_width_pixels / self.ARUCO_MARKER_SIZE_MM
 
                 qimg = cv2_to_qimage(frame)
                 pixmap = QtGui.QPixmap.fromImage(qimg).scaled(
@@ -458,11 +461,11 @@ class DualCameraApp(QtWidgets.QMainWindow):
             QMessageBox.warning(self, 'Error', 'Failed to capture from Camera 2')
             return
 
-        if self.pixels_per_cm_cam1 is None:
+        if self.pixels_per_mm_cam1 is None:
             QMessageBox.warning(self, 'Error', 'Camera 1 not calibrated. Please place ArUco marker in Camera 1 view.')
             return
 
-        if self.pixels_per_cm_cam2 is None:
+        if self.pixels_per_mm_cam2 is None:
             QMessageBox.warning(self, 'Error', 'Camera 2 not calibrated. Please place ArUco marker in Camera 2 view.')
             return
 
@@ -471,10 +474,9 @@ class DualCameraApp(QtWidgets.QMainWindow):
             if len(detections1) > 0:
                 bbox = detections1[0]['bbox']
                 x1, y1, x2, y2 = map(int, bbox)
-                width_pixels = y2 - y1
                 length_pixels = x2 - x1
-                self.width = width_pixels / self.pixels_per_cm_cam1
-                self.length = length_pixels / self.pixels_per_cm_cam1
+                # produce measurements in millimetres
+                self.length = length_pixels / self.pixels_per_mm_cam1
             else:
                 QMessageBox.warning(self, 'Error', 'No object detected in Camera 1')
                 return
@@ -487,8 +489,11 @@ class DualCameraApp(QtWidgets.QMainWindow):
             if len(detections2) > 0:
                 bbox = detections2[0]['bbox']
                 x1, y1, x2, y2 = map(int, bbox)
+                width_pixels = x2 - x1
                 height_pixels = y2 - y1
-                self.height = height_pixels / self.pixels_per_cm_cam2
+                # produce measurement in millimetres
+                self.width = width_pixels / self.pixels_per_mm_cam2
+                self.height = height_pixels / self.pixels_per_mm_cam2
             else:
                 QMessageBox.warning(self, 'Error', 'No object detected in Camera 2')
                 return
@@ -497,7 +502,7 @@ class DualCameraApp(QtWidgets.QMainWindow):
             return
 
         self.status_label.setText(
-            f'Captured: Length={self.length:.1f}cm, Width={self.width:.1f}cm, Height={self.height:.1f}cm'
+            f'Captured: Length={self.length:.2f} mm, Width={self.width:.2f} mm, Height={self.height:.2f} mm'
         )
         self.status_label.setStyleSheet('font-size: 12px; color: #00ff00; padding: 10px;')
         self.generate_btn.setEnabled(True)
@@ -505,24 +510,25 @@ class DualCameraApp(QtWidgets.QMainWindow):
         QMessageBox.information(
             self,
             'Measurements Captured',
-            f'Length: {self.length:.1f} cm\nWidth: {self.width:.1f} cm\nHeight: {self.height:.1f} cm'
+            f'Length: {self.length:.2f} mm\nWidth: {self.width:.2f} mm\nHeight: {self.height:.2f} mm'
         )
 
     def generate_dieline(self):
         """Generate dieline from captured measurements by launching gen_cartondieline.py.
 
-        Measurements in this PyQt app are in cm — convert to mm for the external
-        dieline generator. Use 30 mm glue flap.
+        Measurements in this PyQt app are in millimetres and will be passed
+        directly to the external dieline generator. Use 30 mm glue flap.
         """
         if self.width is None or self.height is None or self.length is None:
             QMessageBox.warning(self, 'Error', 'Please capture measurements first')
             return
 
         try:
-            # Convert cm -> mm
-            length_mm = float(self.length) * 10.0
-            width_mm = float(self.width) * 10.0
-            height_mm = float(self.height) * 10.0
+            # Measurements are already in mm; add 10 mm clearance to each
+            CLEARANCE_MM = 10.0
+            length_mm = float(self.length) + CLEARANCE_MM
+            width_mm = float(self.width) + CLEARANCE_MM
+            height_mm = float(self.height) + CLEARANCE_MM
 
             script_path = os.path.join(os.path.dirname(__file__), 'gen_cartondieline.py')
             args = [sys.executable, script_path,
